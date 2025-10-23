@@ -1,0 +1,12 @@
+# ZAB'S Store - robots.txt
+# This file tells search engines which pages to crawl
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api
+Disallow: /checkout
+Disallow: /cart
+
+# Sitemap location
+Sitemap: https://zabsstore.netlify.app/sitemap.xml
