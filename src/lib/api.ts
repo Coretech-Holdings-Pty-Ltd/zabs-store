@@ -1,15 +1,25 @@
 import { fetchFromMedusa } from './medusa-client';
 import { Product, MedusaProduct, convertMedusaProduct, StoreType } from './types';
 import { DEFAULT_REGION } from './config';
+import { productCache, CACHE_KEYS, withCache } from './cache';
 
 /**
- * Fetch products for a specific store (sales channel)
+ * Fetch products for a specific store (sales channel) - CACHED VERSION
  * @param store - 'electronics' or 'health'
  * @returns Array of products formatted for the UI
  */
 export async function fetchProductsByStore(store: StoreType): Promise<Product[]> {
+  const cacheKey = store === 'health' ? CACHE_KEYS.HEALTH_PRODUCTS : CACHE_KEYS.ELECTRONICS_PRODUCTS;
+  
+  // Try cache first
+  const cached = productCache.get<Product[]>(cacheKey);
+  if (cached) {
+    console.log(`✅ Cache HIT: ${store} products`);
+    return cached;
+  }
+
   try {
-    console.log(`Fetching products for ${store} store...`);
+    console.log(`❌ Cache MISS: Fetching ${store} products...`);
     
     // First, try to get available regions
     let regionId = DEFAULT_REGION;
@@ -44,6 +54,10 @@ export async function fetchProductsByStore(store: StoreType): Promise<Product[]>
       convertMedusaProduct(medusaProduct, store)
     );
 
+    // Cache for 10 minutes
+    productCache.set(cacheKey, products, 10 * 60 * 1000);
+    console.log(`💾 Cached ${store} products`);
+
     return products;
   } catch (error) {
     console.error(`Error fetching products for ${store} store:`, error);
@@ -52,7 +66,7 @@ export async function fetchProductsByStore(store: StoreType): Promise<Product[]>
 }
 
 /**
- * Fetch a single product by ID
+ * Fetch a single product by ID - CACHED VERSION
  * @param productId - Medusa product ID
  * @param store - Store type for proper client selection
  * @returns Single product or null
@@ -61,7 +75,18 @@ export async function fetchProductById(
   productId: string,
   store: StoreType
 ): Promise<Product | null> {
+  const cacheKey = CACHE_KEYS.PRODUCT_DETAIL(productId);
+  
+  // Try cache first
+  const cached = productCache.get<Product>(cacheKey);
+  if (cached) {
+    console.log(`✅ Cache HIT: Product ${productId}`);
+    return cached;
+  }
+
   try {
+    console.log(`❌ Cache MISS: Fetching product ${productId}...`);
+    
     const response = await fetchFromMedusa(
       `/store/products/${productId}?fields=+variants,+variants.prices,+images,+categories`,
       {},
@@ -73,7 +98,13 @@ export async function fetchProductById(
       return null;
     }
 
-    return convertMedusaProduct(response.product as MedusaProduct, store);
+    const product = convertMedusaProduct(response.product as MedusaProduct, store);
+    
+    // Cache for 15 minutes
+    productCache.set(cacheKey, product, 15 * 60 * 1000);
+    console.log(`💾 Cached product ${productId}`);
+
+    return product;
   } catch (error) {
     console.error(`Error fetching product ${productId}:`, error);
     return null;

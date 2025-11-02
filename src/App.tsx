@@ -1,26 +1,44 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { LandingPage } from './components/LandingPage';
-import { HealthCareStore } from './components/HealthCareStore';
-import { ElectronicsStore } from './components/ElectronicsStore';
-import { ProductDetails } from './components/ProductDetails';
-import { Cart, CartItem } from './components/Cart';
-import { Checkout } from './components/Checkout';
-import { AboutPage } from './components/AboutPage';
-import { HelpPage } from './components/HelpPage';
-import { ProfilePage } from './components/ProfilePage';
 import { Product, ProductCard } from './components/ProductCard';
 import { CheckCircle } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
 
+// Lazy load heavy components for faster initial load
+const HealthCareStore = lazy(() => import('./components/HealthCareStore').then(m => ({ default: m.HealthCareStore })));
+const ElectronicsStore = lazy(() => import('./components/ElectronicsStore').then(m => ({ default: m.ElectronicsStore })));
+const ProductDetails = lazy(() => import('./components/ProductDetails').then(m => ({ default: m.ProductDetails })));
+const Cart = lazy(() => import('./components/Cart').then(m => ({ default: m.Cart })));
+const Checkout = lazy(() => import('./components/Checkout').then(m => ({ default: m.Checkout })));
+const AboutPage = lazy(() => import('./components/AboutPage').then(m => ({ default: m.AboutPage })));
+const HelpPage = lazy(() => import('./components/HelpPage').then(m => ({ default: m.HelpPage })));
+const ProfilePage = lazy(() => import('./components/ProfilePage').then(m => ({ default: m.ProfilePage })));
+
+// Import CartItem type
+import type { CartItem } from './components/Cart';
+
 // Medusa imports
 import { fetchProductsByStore } from './lib/api';
 import { StoreType } from './lib/config';
+import { preloadCache, CACHE_KEYS } from './lib/cache';
 
 type Page = 'landing' | 'healthcare' | 'electronics' | 'product' | 'cart' | 'checkout' | 'success' | 'about' | 'help' | 'search' | 'profile';
+
+// Loading component for suspense fallback
+function PageLoader() {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('landing');
@@ -28,20 +46,59 @@ export default function App() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Medusa products state
+  // Medusa products state - NOW LOADED LAZILY
   const [healthCareProducts, setHealthCareProducts] = useState<Product[]>([]);
   const [electronicsProducts, setElectronicsProducts] = useState<Product[]>([]);
-  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsLoading, setProductsLoading] = useState(false); // Changed to false initially
   const [productsError, setProductsError] = useState<string | null>(null);
 
-  // Fetch products from Medusa on component mount
+  // 🚀 PERFORMANCE BOOST: Preload products in background AFTER landing page loads
   useEffect(() => {
-    const loadProducts = async () => {
+    // Preload products silently in background (non-blocking)
+    const preloadProducts = () => {
+      // Start preloading after a short delay to let landing page render first
+      setTimeout(() => {
+        console.log('🚀 Preloading products in background...');
+        
+        // Preload health products
+        preloadCache(
+          CACHE_KEYS.HEALTH_PRODUCTS,
+          () => fetchProductsByStore('health'),
+          10 * 60 * 1000 // 10 minutes
+        );
+        
+        // Preload electronics products
+        preloadCache(
+          CACHE_KEYS.ELECTRONICS_PRODUCTS,
+          () => fetchProductsByStore('electronics'),
+          10 * 60 * 1000 // 10 minutes
+        );
+      }, 1000); // Wait 1 second after landing page loads
+    };
+
+    preloadProducts();
+  }, []);
+
+  // 🚀 LAZY LOAD: Only fetch products when user navigates to store pages
+  useEffect(() => {
+    const loadProductsForPage = async () => {
+      // Only load products when navigating to store pages
+      if (currentPage !== 'healthcare' && currentPage !== 'electronics' && currentPage !== 'search') {
+        return;
+      }
+
+      // Don't reload if already loaded
+      if (healthCareProducts.length > 0 && electronicsProducts.length > 0) {
+        return;
+      }
+
       try {
         setProductsLoading(true);
         setProductsError(null);
 
-        // Fetch both stores' products in parallel
+        console.log('Loading products for store page...');
+
+        // Fetch both stores' products in parallel (will use cache if available)
         const [healthProducts, electronicsProductsData] = await Promise.all([
           fetchProductsByStore('health'),
           fetchProductsByStore('electronics'),
@@ -63,8 +120,8 @@ export default function App() {
       }
     };
 
-    loadProducts();
-  }, []);
+    loadProductsForPage();
+  }, [currentPage, healthCareProducts.length, electronicsProducts.length]);
 
   const allProducts = [...healthCareProducts, ...electronicsProducts];
   const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -281,60 +338,76 @@ export default function App() {
         )}
 
         {currentPage === 'healthcare' && (
-          <HealthCareStore
-            products={healthCareProducts}
-            onAddToCart={handleAddToCart}
-            onProductClick={handleProductClick}
-            onBackToHome={handleBackToHome}
-          />
+          <Suspense fallback={<PageLoader />}>
+            <HealthCareStore
+              products={healthCareProducts}
+              onAddToCart={handleAddToCart}
+              onProductClick={handleProductClick}
+              onBackToHome={handleBackToHome}
+            />
+          </Suspense>
         )}
 
         {currentPage === 'electronics' && (
-          <ElectronicsStore
-            products={electronicsProducts}
-            onAddToCart={handleAddToCart}
-            onProductClick={handleProductClick}
-            onBackToHome={handleBackToHome}
-          />
+          <Suspense fallback={<PageLoader />}>
+            <ElectronicsStore
+              products={electronicsProducts}
+              onAddToCart={handleAddToCart}
+              onProductClick={handleProductClick}
+              onBackToHome={handleBackToHome}
+            />
+          </Suspense>
         )}
 
         {currentPage === 'product' && selectedProduct && (
-          <ProductDetails
-            product={selectedProduct}
-            onAddToCart={handleAddToCart}
-            onBack={handleBackToStore}
-          />
+          <Suspense fallback={<PageLoader />}>
+            <ProductDetails
+              product={selectedProduct}
+              onAddToCart={handleAddToCart}
+              onBack={handleBackToStore}
+            />
+          </Suspense>
         )}
 
         {currentPage === 'cart' && (
-          <Cart
-            items={cartItems}
-            onUpdateQuantity={handleUpdateQuantity}
-            onRemoveItem={handleRemoveItem}
-            onContinueShopping={handleContinueShopping}
-            onCheckout={() => setCurrentPage('checkout')}
-          />
+          <Suspense fallback={<PageLoader />}>
+            <Cart
+              items={cartItems}
+              onUpdateQuantity={handleUpdateQuantity}
+              onRemoveItem={handleRemoveItem}
+              onContinueShopping={handleContinueShopping}
+              onCheckout={() => setCurrentPage('checkout')}
+            />
+          </Suspense>
         )}
 
         {currentPage === 'checkout' && (
-          <Checkout
-            items={cartItems}
-            total={0}
-            onBack={() => setCurrentPage('cart')}
-            onComplete={handleOrderComplete}
-          />
+          <Suspense fallback={<PageLoader />}>
+            <Checkout
+              items={cartItems}
+              total={0}
+              onBack={() => setCurrentPage('cart')}
+              onComplete={handleOrderComplete}
+            />
+          </Suspense>
         )}
 
         {currentPage === 'about' && (
-          <AboutPage onBack={handleBackToHome} />
+          <Suspense fallback={<PageLoader />}>
+            <AboutPage onBack={handleBackToHome} />
+          </Suspense>
         )}
 
         {currentPage === 'help' && (
-          <HelpPage onBack={handleBackToHome} />
+          <Suspense fallback={<PageLoader />}>
+            <HelpPage onBack={handleBackToHome} />
+          </Suspense>
         )}
 
         {currentPage === 'profile' && (
-          <ProfilePage onBack={handleBackToHome} />
+          <Suspense fallback={<PageLoader />}>
+            <ProfilePage onBack={handleBackToHome} />
+          </Suspense>
         )}
 
         {currentPage === 'search' && (
