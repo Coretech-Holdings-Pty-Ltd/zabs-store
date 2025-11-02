@@ -339,84 +339,72 @@ export async function removeFromCart(cartId: string, lineItemId: string) {
 
 /**
  * Customer Authentication - Register
- * Medusa v2 uses /auth/customer/emailpass/register endpoint
+ * Uses Medusa v2 store API (simpler, no auth module needed)
  */
 export async function registerCustomer(email: string, password: string, firstName: string, lastName: string) {
   try {
-    // First, register the customer account
-    const registerResponse = await fetchFromMedusa(
-      '/auth/customer/emailpass/register',
+    console.log('Attempting customer registration...');
+    
+    // Use direct store/customers endpoint (works without auth module)
+    const response = await fetchFromMedusa(
+      '/store/customers',
       {
         method: 'POST',
         body: JSON.stringify({
           email,
           password,
+          first_name: firstName,
+          last_name: lastName,
         }),
       },
       'electronics'
     );
 
-    // Then update customer details (name, etc)
-    if (registerResponse.token) {
-      // Store the token
-      localStorage.setItem('medusa_auth_token', registerResponse.token);
-      
-      // Get customer details to update
-      const customerResponse = await fetchFromMedusa(
-        '/store/customers/me',
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${registerResponse.token}`,
-          },
-        },
-        'electronics'
-      );
-
-      // Update customer with first and last name
-      const updatedResponse = await fetchFromMedusa(
-        '/store/customers/me',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            first_name: firstName,
-            last_name: lastName,
-          }),
-          headers: {
-            'Authorization': `Bearer ${registerResponse.token}`,
-          },
-        },
-        'electronics'
-      );
-
-      return updatedResponse.customer;
+    console.log('Registration successful:', response);
+    
+    // Automatically log in after registration
+    if (response.customer) {
+      // Try to log in to get a session
+      try {
+        return await loginCustomer(email, password);
+      } catch (loginError) {
+        console.log('Auto-login failed, but registration succeeded');
+        return response.customer;
+      }
     }
 
-    return registerResponse.customer;
+    return response.customer;
   } catch (error: any) {
     console.error('Error registering customer:', error);
     
+    // Parse error message
+    const errorMsg = error.message || '';
+    const errorBody = errorMsg.toLowerCase();
+    
     // Provide helpful error messages
-    if (error.message?.includes('401')) {
-      throw new Error('Customer registration is not enabled on the backend. Please check MEDUSA_AUTH_SETUP.md for configuration steps.');
-    } else if (error.message?.includes('409')) {
+    if (errorMsg.includes('already exists') || errorMsg.includes('duplicate') || errorMsg.includes('409')) {
       throw new Error('An account with this email already exists. Please try logging in instead.');
-    } else if (error.message?.includes('400')) {
+    } else if (errorMsg.includes('400') || errorMsg.includes('invalid')) {
       throw new Error('Invalid email or password. Password must be at least 8 characters.');
+    } else if (errorMsg.includes('401') || errorMsg.includes('unauthorized')) {
+      throw new Error('Registration is currently unavailable. Please contact support or try again later.');
     }
     
-    throw new Error(error.message || 'Failed to create account. Please try again.');
+    throw new Error('Failed to create account. Please check your information and try again.');
   }
 }
 
 /**
  * Customer Authentication - Login
- * Medusa v2 uses /auth/customer/emailpass endpoint
+ * Uses Medusa v2 store API with session-based auth
  */
 export async function loginCustomer(email: string, password: string) {
   try {
+    console.log('Attempting customer login...');
+    
+    // Use store/auth endpoint for session-based login
     const response = await fetchFromMedusa(
-      '/auth/customer/emailpass',
+      '/store/auth',
       {
         method: 'POST',
         body: JSON.stringify({
@@ -427,29 +415,56 @@ export async function loginCustomer(email: string, password: string) {
       'electronics'
     );
     
-    // Store auth token if provided
+    console.log('Login response:', response);
+    
+    // Store session/token if provided
     if (response.token) {
       localStorage.setItem('medusa_auth_token', response.token);
-      
-      // Fetch customer details
-      const customerResponse = await fetchFromMedusa(
-        '/store/customers/me',
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${response.token}`,
-          },
-        },
-        'electronics'
-      );
-      
-      return customerResponse.customer;
     }
     
-    return response.customer;
-  } catch (error) {
+    // Fetch customer details if we have a token or customer object
+    if (response.customer) {
+      return response.customer;
+    }
+    
+    // Try to fetch customer details with token
+    if (response.token) {
+      try {
+        const customerResponse = await fetchFromMedusa(
+          '/store/customers/me',
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${response.token}`,
+            },
+          },
+          'electronics'
+        );
+        
+        return customerResponse.customer;
+      } catch (fetchError) {
+        console.warn('Could not fetch customer details after login');
+      }
+    }
+    
+    // Return basic customer info from login response
+    return response.customer || { email };
+    
+  } catch (error: any) {
     console.error('Error logging in:', error);
-    throw error;
+    
+    const errorMsg = error.message || '';
+    
+    // Provide helpful error messages
+    if (errorMsg.includes('401') || errorMsg.includes('unauthorized')) {
+      throw new Error('Invalid email or password. Please check your credentials and try again.');
+    } else if (errorMsg.includes('404')) {
+      throw new Error('Account not found. Please register first.');
+    } else if (errorMsg.includes('400')) {
+      throw new Error('Invalid login request. Please check your email and password.');
+    }
+    
+    throw new Error('Login failed. Please try again or contact support.');
   }
 }
 
