@@ -339,47 +339,68 @@ export async function removeFromCart(cartId: string, lineItemId: string) {
 
 /**
  * Customer Authentication - Register
- * Uses Medusa v2 store API (simpler, no auth module needed)
+ * Uses Medusa v2 auth module with email/password provider
  */
 export async function registerCustomer(email: string, password: string, firstName: string, lastName: string) {
   try {
-    console.log('Attempting customer registration...');
+    console.log('🔐 Attempting customer registration with auth module...');
     
-    // Use direct store/customers endpoint (works without auth module)
-    const response = await fetchFromMedusa(
-      '/store/customers',
+    // Step 1: Register using the auth module endpoint
+    // This creates both the auth identity AND the customer
+    const authResponse = await fetchFromMedusa(
+      '/auth/customer/emailpass/register',
       {
         method: 'POST',
         body: JSON.stringify({
           email,
           password,
-          first_name: firstName,
-          last_name: lastName,
         }),
       },
       'electronics'
     );
 
-    console.log('Registration successful:', response);
-    
-    // Automatically log in after registration
-    if (response.customer) {
-      // Try to log in to get a session
+    console.log('✅ Auth registration successful:', authResponse);
+
+    // Step 2: Get the token from the response
+    const token = authResponse.token;
+    if (token) {
+      localStorage.setItem('medusa_auth_token', token);
+      console.log('🔑 Token stored successfully');
+    }
+
+    // Step 3: Update customer profile with first/last name
+    // The customer is auto-created by the auth module, we just need to update it
+    if (token) {
       try {
-        return await loginCustomer(email, password);
-      } catch (loginError) {
-        console.log('Auto-login failed, but registration succeeded');
-        return response.customer;
+        const updateResponse = await fetchFromMedusa(
+          '/store/customers/me',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              first_name: firstName,
+              last_name: lastName,
+            }),
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          },
+          'electronics'
+        );
+        console.log('✅ Customer profile updated with name');
+        return updateResponse.customer;
+      } catch (updateError) {
+        console.warn('⚠️ Could not update customer name, but registration succeeded');
+        // Still return the basic customer info
+        return authResponse.customer;
       }
     }
 
-    return response.customer;
+    return authResponse.customer;
   } catch (error: any) {
-    console.error('Error registering customer:', error);
+    console.error('❌ Error registering customer:', error);
     
     // Parse error message
     const errorMsg = error.message || '';
-    const errorBody = errorMsg.toLowerCase();
     
     // Provide helpful error messages
     if (errorMsg.includes('already exists') || errorMsg.includes('duplicate') || errorMsg.includes('409')) {
@@ -387,7 +408,9 @@ export async function registerCustomer(email: string, password: string, firstNam
     } else if (errorMsg.includes('400') || errorMsg.includes('invalid')) {
       throw new Error('Invalid email or password. Password must be at least 8 characters.');
     } else if (errorMsg.includes('401') || errorMsg.includes('unauthorized')) {
-      throw new Error('Registration is currently unavailable. Please contact support or try again later.');
+      throw new Error('Registration is currently unavailable. Please ensure the backend auth module is running.');
+    } else if (errorMsg.includes('404')) {
+      throw new Error('Authentication endpoint not found. Please contact support.');
     }
     
     throw new Error('Failed to create account. Please check your information and try again.');
@@ -396,15 +419,15 @@ export async function registerCustomer(email: string, password: string, firstNam
 
 /**
  * Customer Authentication - Login
- * Uses Medusa v2 store API with session-based auth
+ * Uses Medusa v2 auth module with email/password provider
  */
 export async function loginCustomer(email: string, password: string) {
   try {
-    console.log('Attempting customer login...');
+    console.log('🔐 Attempting customer login with auth module...');
     
-    // Use store/auth endpoint for session-based login
-    const response = await fetchFromMedusa(
-      '/store/auth',
+    // Use the auth module emailpass login endpoint
+    const authResponse = await fetchFromMedusa(
+      '/auth/customer/emailpass',
       {
         method: 'POST',
         body: JSON.stringify({
@@ -415,43 +438,50 @@ export async function loginCustomer(email: string, password: string) {
       'electronics'
     );
     
-    console.log('Login response:', response);
+    console.log('✅ Auth login successful:', authResponse);
     
-    // Store session/token if provided
-    if (response.token) {
-      localStorage.setItem('medusa_auth_token', response.token);
+    // Store the auth token
+    const token = authResponse.token;
+    if (token) {
+      localStorage.setItem('medusa_auth_token', token);
+      console.log('🔑 Token stored successfully');
     }
     
-    // Fetch customer details if we have a token or customer object
-    if (response.customer) {
-      return response.customer;
-    }
-    
-    // Try to fetch customer details with token
-    if (response.token) {
+    // Fetch full customer details using the token
+    if (token) {
       try {
         const customerResponse = await fetchFromMedusa(
           '/store/customers/me',
           {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${response.token}`,
+              'Authorization': `Bearer ${token}`,
             },
           },
           'electronics'
         );
         
+        console.log('✅ Customer details fetched successfully');
         return customerResponse.customer;
       } catch (fetchError) {
-        console.warn('Could not fetch customer details after login');
+        console.warn('⚠️ Could not fetch customer details, but login succeeded');
+        // Return basic info from auth response if available
+        if (authResponse.customer) {
+          return authResponse.customer;
+        }
       }
     }
     
-    // Return basic customer info from login response
-    return response.customer || { email };
+    // Fallback: return customer from auth response if available
+    if (authResponse.customer) {
+      return authResponse.customer;
+    }
+    
+    // Return basic customer info with email
+    return { email };
     
   } catch (error: any) {
-    console.error('Error logging in:', error);
+    console.error('❌ Error logging in:', error);
     
     const errorMsg = error.message || '';
     
