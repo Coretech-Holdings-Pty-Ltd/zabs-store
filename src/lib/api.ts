@@ -442,23 +442,21 @@ export async function loginCustomer(email: string, password: string) {
     
     console.log('✅ Auth login successful:', authResponse);
     
-    // Store the auth token
+    // Store the auth token FIRST (before any authenticated requests)
     const token = authResponse.token;
     if (token) {
       localStorage.setItem('medusa_auth_token', token);
       console.log('🔑 Token stored successfully');
     }
     
-    // Fetch full customer details using the token
+    // Fetch full customer details using the stored token
+    // Note: fetchFromMedusa automatically includes the token from localStorage
     if (token) {
       try {
         const customerResponse = await fetchFromMedusa(
           '/store/customers/me',
           {
             method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
           },
           'electronics'
         );

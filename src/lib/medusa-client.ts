@@ -49,9 +49,13 @@ export async function fetchFromMedusa(
 ): Promise<any> {
   const publishableKey = getPublishableKey(store);
   
+  // Get auth token from localStorage if available
+  const authToken = localStorage.getItem('medusa_auth_token');
+  
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(publishableKey && { 'x-publishable-api-key': publishableKey }),
+    ...(authToken && { 'Authorization': `Bearer ${authToken}` }),
     ...options.headers,
   };
 
