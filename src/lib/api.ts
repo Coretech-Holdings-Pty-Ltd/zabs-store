@@ -399,21 +399,23 @@ export async function registerCustomer(email: string, password: string, firstNam
   } catch (error: any) {
     console.error('❌ Error registering customer:', error);
     
-    // Parse error message
-    const errorMsg = error.message || '';
+    // Parse error message (check the full error object)
+    const errorMsg = (error.message || '').toLowerCase();
+    const errorString = JSON.stringify(error).toLowerCase();
     
-    // Provide helpful error messages
-    if (errorMsg.includes('already exists') || errorMsg.includes('duplicate') || errorMsg.includes('409')) {
-      throw new Error('An account with this email already exists. Please try logging in instead.');
+    // Provide helpful error messages (check most specific errors first)
+    if (errorMsg.includes('already exists') || errorString.includes('already exists') || 
+        errorMsg.includes('duplicate') || errorString.includes('duplicate')) {
+      throw new Error('✉️ An account with this email already exists. Please try logging in instead.');
+    } else if (errorMsg.includes('404') || errorString.includes('404')) {
+      throw new Error('🔧 Authentication endpoint not found. Please ensure the backend is running.');
     } else if (errorMsg.includes('400') || errorMsg.includes('invalid')) {
-      throw new Error('Invalid email or password. Password must be at least 8 characters.');
+      throw new Error('⚠️ Invalid email or password. Password must be at least 8 characters.');
     } else if (errorMsg.includes('401') || errorMsg.includes('unauthorized')) {
-      throw new Error('Registration is currently unavailable. Please ensure the backend auth module is running.');
-    } else if (errorMsg.includes('404')) {
-      throw new Error('Authentication endpoint not found. Please contact support.');
+      throw new Error('🔒 Registration failed. Please check your information or try logging in if you already have an account.');
     }
     
-    throw new Error('Failed to create account. Please check your information and try again.');
+    throw new Error('❌ Failed to create account. Please check your information and try again.');
   }
 }
 
@@ -483,18 +485,19 @@ export async function loginCustomer(email: string, password: string) {
   } catch (error: any) {
     console.error('❌ Error logging in:', error);
     
-    const errorMsg = error.message || '';
+    const errorMsg = (error.message || '').toLowerCase();
+    const errorString = JSON.stringify(error).toLowerCase();
     
     // Provide helpful error messages
-    if (errorMsg.includes('401') || errorMsg.includes('unauthorized')) {
-      throw new Error('Invalid email or password. Please check your credentials and try again.');
-    } else if (errorMsg.includes('404')) {
-      throw new Error('Account not found. Please register first.');
-    } else if (errorMsg.includes('400')) {
-      throw new Error('Invalid login request. Please check your email and password.');
+    if (errorMsg.includes('404') || errorString.includes('404')) {
+      throw new Error('👤 Account not found. Please register first or check your email.');
+    } else if (errorMsg.includes('401') || errorMsg.includes('unauthorized') || errorString.includes('unauthorized')) {
+      throw new Error('🔒 Invalid email or password. Please check your credentials and try again.');
+    } else if (errorMsg.includes('400') || errorString.includes('400')) {
+      throw new Error('⚠️ Invalid login request. Please check your email and password format.');
     }
     
-    throw new Error('Login failed. Please try again or contact support.');
+    throw new Error('❌ Login failed. Please try again or contact support.');
   }
 }
 
