@@ -10,9 +10,11 @@ export interface CartItem {
 }
 
 interface CartProps {
+  isOpen?: boolean;
+  onClose?: () => void;
   items: CartItem[];
-  onUpdateQuantity: (productId: number, newQuantity: number) => void;
-  onRemoveItem: (productId: number) => void;
+  onUpdateQuantity: (productId: string, newQuantity: number) => void;
+  onRemoveItem: (productId: string) => void;
   onContinueShopping: () => void;
   onCheckout: () => void;
 }

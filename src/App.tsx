@@ -406,7 +406,11 @@ export default function App() {
 
         {currentPage === 'profile' && (
           <Suspense fallback={<PageLoader />}>
-            <ProfilePage onBack={handleBackToHome} />
+            <ProfilePage 
+              onBack={handleBackToHome}
+              onViewProduct={handleProductClick}
+              onAddToCart={handleAddToCart}
+            />
           </Suspense>
         )}
 

@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useAuth } from '../lib/hooks';
+import { useAuth } from '../lib/auth-context';
 import { createPortal } from 'react-dom';
 import {
   DropdownMenu,
@@ -28,7 +28,7 @@ export function Header({ cartItemCount, onCartClick, onLogoClick, onSelectStore,
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { customer, isAuthenticated, logout } = useAuth();
+  const { customer, user, signOut } = useAuth();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +40,7 @@ export function Header({ cartItemCount, onCartClick, onLogoClick, onSelectStore,
   };
 
   const handleLogout = async () => {
-    await logout();
+    await signOut();
     onLogoClick(); // Go back to home
   };
 
@@ -148,7 +148,7 @@ export function Header({ cartItemCount, onCartClick, onLogoClick, onSelectStore,
             </motion.div>
 
             {/* Profile - Desktop */}
-            {isAuthenticated ? (
+            {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
@@ -274,7 +274,7 @@ export function Header({ cartItemCount, onCartClick, onLogoClick, onSelectStore,
                 </div>
 
                 {/* User Profile Section */}
-                {isAuthenticated ? (
+                {user ? (
                   <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -283,13 +283,13 @@ export function Header({ cartItemCount, onCartClick, onLogoClick, onSelectStore,
                   >
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center text-purple-600 text-xl font-bold shadow-lg">
-                        {customer?.first_name?.[0]}{customer?.last_name?.[0]}
+                        {customer?.first_name?.[0] || user?.email?.[0]?.toUpperCase()}{customer?.last_name?.[0] || ''}
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="text-white font-semibold text-lg truncate">
                           {customer?.first_name} {customer?.last_name}
                         </h3>
-                        <p className="text-purple-100 text-sm truncate">{customer?.email}</p>
+                        <p className="text-purple-100 text-sm truncate">{customer?.email || user?.email}</p>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2 mt-3">

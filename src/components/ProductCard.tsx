@@ -2,9 +2,10 @@ import { ShoppingCart, Heart, Star } from 'lucide-react';
 import { Button } from './ui/button';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { motion } from 'motion/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from './ui/card';
 import type { Product } from '../lib/types';
+import { toggleWishlist, isInWishlist } from '../lib/wishlist';
 
 // Re-export Product type for backwards compatibility
 export type { Product } from '../lib/types';
@@ -20,6 +21,24 @@ export function ProductCard({ product, onAddToCart, onProductClick }: ProductCar
   const themeColor = product.store === 'healthcare' ? 'healthcare' : 'electronics';
   const priceWithVAT = product.price;
   const priceExclVAT = product.price / 1.15;
+
+  // Check if product is in wishlist on mount
+  useEffect(() => {
+    isInWishlist(product.id).then(setIsWishlisted);
+  }, [product.id]);
+
+  const handleWishlistClick = async () => {
+    const success = await toggleWishlist({
+      product_id: product.id,
+      product_title: product.name,
+      product_price: Math.round(product.price * 100), // Convert to cents
+      product_thumbnail: product.image,
+      product_handle: product.handle,
+    });
+    if (success) {
+      setIsWishlisted(!isWishlisted);
+    }
+  };
 
   return (
     <motion.div
@@ -71,7 +90,7 @@ export function ProductCard({ product, onAddToCart, onProductClick }: ProductCar
               className="w-10 h-10 rounded-full bg-white/90 hover:bg-white shadow-lg backdrop-blur-sm"
               onClick={(e) => {
                 e.stopPropagation();
-                setIsWishlisted(!isWishlisted);
+                handleWishlistClick();
               }}
             >
               <motion.div
