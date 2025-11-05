@@ -64,8 +64,8 @@ export function ProductCard({ product, onAddToCart, onProductClick }: ProductCar
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
           />
           
-          {/* Rating Badge */}
-          {product.rating >= 4.5 && (
+          {/* Rating Badge - Only show for rated products */}
+          {product.rating > 0 && (
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -73,7 +73,7 @@ export function ProductCard({ product, onAddToCart, onProductClick }: ProductCar
               className="absolute top-3 left-3 bg-gray-900 text-white px-3 py-1.5 rounded-full text-xs flex items-center gap-1 shadow-lg backdrop-blur-sm"
             >
               <Star className="w-3 h-3 fill-current" />
-              {product.rating}
+              {product.rating.toFixed(1)}
             </motion.div>
           )}
           

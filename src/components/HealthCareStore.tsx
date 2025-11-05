@@ -20,6 +20,8 @@ export function HealthCareStore({ products, onAddToCart, onProductClick, onBackT
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
   const [sortBy, setSortBy] = useState('featured');
   const [filterOpen, setFilterOpen] = useState(false);
+  const [displayCount, setDisplayCount] = useState(12); // Show 12 products initially
+  const PRODUCTS_PER_PAGE = 12;
 
   const handleCategoryChange = (category: string) => {
     setSelectedCategories(prev =>
@@ -27,6 +29,12 @@ export function HealthCareStore({ products, onAddToCart, onProductClick, onBackT
         ? prev.filter(c => c !== category)
         : [...prev, category]
     );
+    handleFilterChange();
+  };
+
+  const handlePriceChange = (newRange: [number, number]) => {
+    setPriceRange(newRange);
+    handleFilterChange();
   };
 
   const filteredProducts = products
@@ -43,6 +51,19 @@ export function HealthCareStore({ products, onAddToCart, onProductClick, onBackT
         default: return 0;
       }
     });
+
+  // Get products to display (paginated)
+  const displayedProducts = filteredProducts.slice(0, displayCount);
+  const hasMore = displayCount < filteredProducts.length;
+
+  // Reset display count when filters change
+  const handleFilterChange = () => {
+    setDisplayCount(PRODUCTS_PER_PAGE);
+  };
+
+  const loadMore = () => {
+    setDisplayCount(prev => Math.min(prev + PRODUCTS_PER_PAGE, filteredProducts.length));
+  };
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -219,7 +240,7 @@ export function HealthCareStore({ products, onAddToCart, onProductClick, onBackT
                 selectedCategories={selectedCategories}
                 onCategoryChange={handleCategoryChange}
                 priceRange={priceRange}
-                onPriceChange={setPriceRange}
+                onPriceChange={handlePriceChange}
                 maxPrice={1000}
               />
               
@@ -242,27 +263,49 @@ export function HealthCareStore({ products, onAddToCart, onProductClick, onBackT
           {/* Product Grid */}
           <div className="lg:col-span-3">
             {filteredProducts.length > 0 ? (
-              <motion.div 
-                layout
-                className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"
-              >
-                {filteredProducts.map((product, index) => (
-                  <motion.div
-                    key={product.id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ delay: index * 0.05 }}
+              <>
+                <motion.div 
+                  layout
+                  className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"
+                >
+                  {displayedProducts.map((product, index) => (
+                    <motion.div
+                      key={product.id}
+                      layout
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <ProductCard
+                        product={product}
+                        onAddToCart={onAddToCart}
+                        onProductClick={onProductClick}
+                      />
+                    </motion.div>
+                  ))}
+                </motion.div>
+
+                {/* Load More Button */}
+                {hasMore && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex justify-center mt-12"
                   >
-                    <ProductCard
-                      product={product}
-                      onAddToCart={onAddToCart}
-                      onProductClick={onProductClick}
-                    />
+                    <Button
+                      onClick={loadMore}
+                      size="lg"
+                      className="bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-600 hover:to-teal-700 text-white rounded-2xl px-12 h-14 text-base shadow-lg shadow-cyan-500/30 hover:shadow-xl hover:scale-105 transition-all"
+                    >
+                      Load More Products
+                      <span className="ml-2 text-sm opacity-80">
+                        ({filteredProducts.length - displayCount} remaining)
+                      </span>
+                    </Button>
                   </motion.div>
-                ))}
-              </motion.div>
+                )}
+              </>
             ) : (
               <motion.div 
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -333,7 +376,7 @@ export function HealthCareStore({ products, onAddToCart, onProductClick, onBackT
                   selectedCategories={selectedCategories}
                   onCategoryChange={handleCategoryChange}
                   priceRange={priceRange}
-                  onPriceChange={setPriceRange}
+                  onPriceChange={handlePriceChange}
                   maxPrice={1000}
                 />
 

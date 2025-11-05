@@ -327,7 +327,7 @@ export default function App() {
         onSearch={handleSearch}
       />
 
-      <main className="flex-1">
+      <main className="flex-1 pb-24 lg:pb-0">{/* Add bottom padding for floating mobile nav */}
         {currentPage === 'landing' && (
           <LandingPage 
             onSelectStore={handleSelectStore}

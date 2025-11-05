@@ -1,18 +1,9 @@
-import { ShoppingCart, Search, User, Menu, X, LogOut, Heart, Home, Activity, Smartphone, Info, MessageCircle } from 'lucide-react';
+import { ShoppingCart, Search, User, Heart, Home, Activity, Smartphone, Zap, Pill } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/auth-context';
-import { createPortal } from 'react-dom';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from './ui/dropdown-menu';
 
 interface HeaderProps {
   cartItemCount: number;
@@ -27,8 +18,7 @@ interface HeaderProps {
 export function Header({ cartItemCount, onCartClick, onLogoClick, onSelectStore, onNavigate, currentPage, onSearch }: HeaderProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { customer, user, signOut } = useAuth();
+  const { customer, user } = useAuth();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,11 +27,6 @@ export function Header({ cartItemCount, onCartClick, onLogoClick, onSelectStore,
       setSearchOpen(false);
       setSearchQuery('');
     }
-  };
-
-  const handleLogout = async () => {
-    await signOut();
-    onLogoClick(); // Go back to home
   };
 
   const NavLink = ({ onClick, active, children }: { onClick: () => void; active: boolean; children: React.ReactNode }) => (
@@ -149,31 +134,18 @@ export function Header({ cartItemCount, onCartClick, onLogoClick, onSelectStore,
 
             {/* Profile - Desktop */}
             {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost"
-                    className="hidden md:flex items-center gap-2 rounded-full h-10 px-4 hover:bg-gray-100"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 flex items-center justify-center text-white text-sm font-medium">
-                      {customer?.first_name?.[0]}{customer?.last_name?.[0]}
-                    </div>
-                    <span className="text-sm font-medium">{customer?.first_name}</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onNavigate?.('profile')}>
-                    <User className="w-4 h-4 mr-2" />
-                    Profile
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleLogout}>
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Sign Out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button 
+                  variant="ghost"
+                  className="hidden md:flex items-center gap-2 rounded-full h-10 px-4 hover:bg-gray-100"
+                  onClick={() => onNavigate?.('profile')}
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 flex items-center justify-center text-white text-sm font-medium">
+                    {customer?.first_name?.[0]}{customer?.last_name?.[0]}
+                  </div>
+                  <span className="text-sm font-medium">{customer?.first_name}</span>
+                </Button>
+              </motion.div>
             ) : (
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button 
@@ -185,16 +157,6 @@ export function Header({ cartItemCount, onCartClick, onLogoClick, onSelectStore,
                 </Button>
               </motion.div>
             )}
-
-            {/* Mobile Menu Button */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="lg:hidden rounded-full hover:bg-gray-100 w-10 h-10"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </Button>
           </div>
         </div>
 
@@ -231,243 +193,105 @@ export function Header({ cartItemCount, onCartClick, onLogoClick, onSelectStore,
       </div>
     </motion.header>
 
-    {/* Mobile Menu - Rendered via Portal to document.body */}
-    {createPortal(
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[99998] lg:hidden"
-              onClick={() => setMobileMenuOpen(false)}
-            />
-              
-              {/* Menu Panel */}
-              <motion.div
-                initial={{ x: '100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '100%' }}
-                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                className="fixed top-0 right-0 bottom-0 w-[85vw] max-w-sm bg-white z-[99999] shadow-2xl lg:hidden overflow-y-auto"
-              >
-              {/* Header Section */}
-              <div className="bg-gradient-to-br from-purple-600 via-purple-500 to-indigo-600 p-6 pb-8">
-                <div className="flex items-center justify-between mb-6">
-                  <motion.h2 
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="text-2xl font-bold text-white"
-                  >
-                    Menu
-                  </motion.h2>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="rounded-full text-white hover:bg-white/20"
-                  >
-                    <X className="w-6 h-6" />
-                  </Button>
+    {/* Modern Floating Bottom Navigation - Mobile Only */}
+    <motion.div
+      initial={{ y: 100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-50 p-4"
+      style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+    >
+      <nav className="max-w-lg mx-auto">
+        <div className="bg-white/70 backdrop-blur-3xl border-2 border-white/60 rounded-full shadow-2xl shadow-black/10 px-3 py-3">
+          <div className="flex items-center justify-between gap-1">
+            
+            {/* Cart - Far Left */}
+            <motion.button
+              whileHover={{ scale: 1.15, y: -4 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={onCartClick}
+              className="relative flex flex-col items-center justify-center p-3 rounded-full transition-all bg-gradient-to-br from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 shadow-md hover:shadow-xl border border-purple-100/50 min-w-[56px]"
+            >
+              <ShoppingCart className="w-6 h-6 text-purple-600" strokeWidth={2.5} />
+              {cartItemCount > 0 && (
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-600 text-white text-[10px] font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-1.5 border-2 border-white shadow-lg"
+                >
+                  {cartItemCount > 9 ? '9+' : cartItemCount}
+                </motion.div>
+              )}
+            </motion.button>
+
+            {/* Health - Left of Home */}
+            <motion.button
+              whileHover={{ scale: 1.15, y: -4 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => onSelectStore?.('healthcare')}
+              className={`flex flex-col items-center justify-center p-3 rounded-full transition-all shadow-md hover:shadow-xl border min-w-[56px] ${
+                currentPage === 'healthcare'
+                  ? 'bg-gradient-to-br from-cyan-500 to-teal-600 text-white shadow-lg shadow-cyan-500/50 border-cyan-400/50 scale-105'
+                  : 'bg-gradient-to-br from-cyan-50 to-teal-50 hover:from-cyan-100 hover:to-teal-100 text-cyan-600 border-cyan-100/50'
+              }`}
+            >
+              <Pill className="w-6 h-6" strokeWidth={2.5} />
+            </motion.button>
+
+            {/* Home - Center (Larger) */}
+            <motion.button
+              whileHover={{ scale: 1.2, y: -6 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={onLogoClick}
+              className={`flex flex-col items-center justify-center p-4 rounded-full transition-all shadow-xl hover:shadow-2xl border-2 min-w-[64px] ${
+                currentPage === 'landing'
+                  ? 'bg-gradient-to-br from-purple-600 via-purple-500 to-indigo-600 text-white shadow-purple-500/50 border-purple-400/50 scale-110'
+                  : 'bg-gradient-to-br from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 text-purple-600 border-purple-100/50'
+              }`}
+            >
+              <Home className="w-7 h-7" strokeWidth={2.5} />
+            </motion.button>
+
+            {/* Tech - Right of Home */}
+            <motion.button
+              whileHover={{ scale: 1.15, y: -4 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => onSelectStore?.('electronics')}
+              className={`flex flex-col items-center justify-center p-3 rounded-full transition-all shadow-md hover:shadow-xl border min-w-[56px] ${
+                currentPage === 'electronics'
+                  ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/50 border-indigo-400/50 scale-105'
+                  : 'bg-gradient-to-br from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 text-indigo-600 border-indigo-100/50'
+              }`}
+            >
+              <Zap className="w-6 h-6" strokeWidth={2.5} />
+            </motion.button>
+
+            {/* Profile - Far Right */}
+            <motion.button
+              whileHover={{ scale: 1.15, y: -4 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => onNavigate?.('profile')}
+              className={`flex flex-col items-center justify-center p-3 rounded-full transition-all shadow-md hover:shadow-xl border min-w-[56px] ${
+                currentPage === 'profile'
+                  ? 'bg-gradient-to-br from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/50 border-purple-400/50 scale-105'
+                  : user
+                  ? 'bg-gradient-to-br from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 text-purple-600 border-purple-100/50'
+                  : 'bg-gradient-to-br from-gray-50 to-slate-50 hover:from-gray-100 hover:to-slate-100 text-gray-600 border-gray-100/50'
+              }`}
+            >
+              {user ? (
+                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-white text-[11px] font-bold border-2 border-white/30 shadow-inner">
+                  {customer?.first_name?.[0]}{customer?.last_name?.[0]}
                 </div>
+              ) : (
+                <User className="w-6 h-6" strokeWidth={2.5} />
+              )}
+            </motion.button>
 
-                {/* User Profile Section */}
-                {user ? (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                    className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center text-purple-600 text-xl font-bold shadow-lg">
-                        {customer?.first_name?.[0] || user?.email?.[0]?.toUpperCase()}{customer?.last_name?.[0] || ''}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-white font-semibold text-lg truncate">
-                          {customer?.first_name} {customer?.last_name}
-                        </h3>
-                        <p className="text-purple-100 text-sm truncate">{customer?.email || user?.email}</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 mt-3">
-                      <button
-                        onClick={() => {
-                          onNavigate?.('profile');
-                          setMobileMenuOpen(false);
-                        }}
-                        className="flex items-center justify-center gap-2 bg-white/20 hover:bg-white/30 text-white rounded-xl py-2 text-sm font-medium transition-all"
-                      >
-                        <User className="w-4 h-4" />
-                        Profile
-                      </button>
-                      <button
-                        onClick={() => {
-                          handleLogout();
-                          setMobileMenuOpen(false);
-                        }}
-                        className="flex items-center justify-center gap-2 bg-white/20 hover:bg-white/30 text-white rounded-xl py-2 text-sm font-medium transition-all"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        Sign Out
-                      </button>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <motion.button
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                    onClick={() => {
-                      onNavigate?.('profile');
-                      setMobileMenuOpen(false);
-                    }}
-                    className="w-full bg-white text-purple-600 rounded-2xl py-4 px-6 font-semibold text-base shadow-xl hover:shadow-2xl transition-all flex items-center justify-center gap-2"
-                  >
-                    <User className="w-5 h-5" />
-                    Sign In / Register
-                  </motion.button>
-                )}
-              </div>
-
-              {/* Navigation Links */}
-              <div className="p-6 space-y-2">
-                <motion.button
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.15 }}
-                  onClick={() => {
-                    onLogoClick();
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-base font-medium transition-all ${
-                    currentPage === 'landing'
-                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/30'
-                      : 'hover:bg-gray-100 text-gray-700 active:scale-95'
-                  }`}
-                >
-                  <Home className="w-5 h-5 flex-shrink-0" />
-                  <span>Home</span>
-                </motion.button>
-                
-                <motion.button
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.2 }}
-                  onClick={() => {
-                    onSelectStore?.('healthcare');
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-base font-medium transition-all ${
-                    currentPage === 'healthcare'
-                      ? 'bg-gradient-to-r from-cyan-500 to-teal-600 text-white shadow-lg shadow-cyan-500/30'
-                      : 'hover:bg-gray-100 text-gray-700 active:scale-95'
-                  }`}
-                >
-                  <Activity className="w-5 h-5 flex-shrink-0" />
-                  <span>Health & Wellness</span>
-                </motion.button>
-                
-                <motion.button
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.25 }}
-                  onClick={() => {
-                    onSelectStore?.('electronics');
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-base font-medium transition-all ${
-                    currentPage === 'electronics'
-                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/30'
-                      : 'hover:bg-gray-100 text-gray-700 active:scale-95'
-                  }`}
-                >
-                  <Smartphone className="w-5 h-5 flex-shrink-0" />
-                  <span>Electronics</span>
-                </motion.button>
-
-                <motion.button
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 }}
-                  onClick={() => {
-                    onNavigate?.('about');
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-base font-medium transition-all ${
-                    currentPage === 'about'
-                      ? 'bg-gray-900 text-white'
-                      : 'hover:bg-gray-100 text-gray-700 active:scale-95'
-                  }`}
-                >
-                  <Info className="w-5 h-5 flex-shrink-0" />
-                  <span>About Us</span>
-                </motion.button>
-
-                <motion.button
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.35 }}
-                  onClick={() => {
-                    onNavigate?.('help');
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-base font-medium transition-all ${
-                    currentPage === 'help'
-                      ? 'bg-gray-900 text-white'
-                      : 'hover:bg-gray-100 text-gray-700 active:scale-95'
-                  }`}
-                >
-                  <MessageCircle className="w-5 h-5 flex-shrink-0" />
-                  <span>Contact</span>
-                </motion.button>
-              </div>
-
-              {/* Quick Actions */}
-              <div className="px-6 pb-6">
-                <div className="border-t pt-6 grid grid-cols-2 gap-3">
-                  <motion.button
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                    onClick={() => {
-                      // TODO: Add wishlist functionality
-                      setMobileMenuOpen(false);
-                    }}
-                    className="flex flex-col items-center gap-2 bg-gradient-to-br from-pink-500 to-rose-500 text-white rounded-2xl py-4 px-4 font-medium text-sm shadow-lg hover:shadow-xl transition-all active:scale-95"
-                  >
-                    <Heart className="w-6 h-6" />
-                    <span>Wishlist</span>
-                  </motion.button>
-                  
-                  <motion.button
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.45 }}
-                    onClick={() => {
-                      onCartClick();
-                      setMobileMenuOpen(false);
-                    }}
-                    className="relative flex flex-col items-center gap-2 bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-2xl py-4 px-4 font-medium text-sm shadow-lg hover:shadow-xl transition-all active:scale-95"
-                  >
-                    <ShoppingCart className="w-6 h-6" />
-                    <span>Cart</span>
-                    {cartItemCount > 0 && (
-                      <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border-2 border-white">
-                        {cartItemCount}
-                      </div>
-                    )}
-                  </motion.button>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>,
-      document.body
-    )}
+          </div>
+        </div>
+      </nav>
+    </motion.div>
     </>
   );
 }
