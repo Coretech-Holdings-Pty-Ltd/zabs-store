@@ -7,6 +7,7 @@
 ## 🌟 Overview
 
 ZABS is a premium e-commerce platform featuring two specialized stores:
+
 - **Healthcare Store** - Premium health & wellness products
 - **Electronics Store** - Cutting-edge electronics and gadgets
 
@@ -28,6 +29,7 @@ Built with React, TypeScript, Vite, and powered by Medusa.js v2 backend.
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Node.js 18+ or higher
 - npm or pnpm
 - Medusa.js v2 backend running
@@ -56,6 +58,7 @@ The app will be available at `http://localhost:5173`
 For detailed documentation, see:
 
 - **[DOCUMENTATION.md](./DOCUMENTATION.md)** - Complete platform documentation
+
   - Cart system architecture
   - Order creation flow
   - Payment integration
@@ -73,6 +76,7 @@ For detailed documentation, see:
 ## 🛠️ Tech Stack
 
 ### Frontend
+
 - **Framework**: React 18.3
 - **Language**: TypeScript
 - **Build Tool**: Vite 6.3
@@ -82,12 +86,14 @@ For detailed documentation, see:
 - **Icons**: Lucide React
 
 ### Backend Integration
+
 - **E-commerce**: Medusa.js v2
 - **Authentication**: Supabase Auth
 - **Database**: PostgreSQL (via Supabase)
 - **Payments**: PayFast, Ozow
 
 ### Hosting
+
 - **Frontend**: Netlify
 - **Backend**: Railway
 - **Database**: Supabase
@@ -210,6 +216,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 📞 Support
 
 For support and questions:
+
 - Check [DOCUMENTATION.md](./DOCUMENTATION.md) for detailed guides
 - Review [DATABASE-SCRIPTS.sql](./DATABASE-SCRIPTS.sql) for database issues
 - Open an issue on GitHub
@@ -218,4 +225,3 @@ For support and questions:
 ---
 
 **Made with ❤️ by the ZABS Team**
-

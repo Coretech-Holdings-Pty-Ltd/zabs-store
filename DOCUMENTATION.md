@@ -22,6 +22,7 @@
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Node.js 18+ and pnpm/npm
 - Medusa.js v2 backend running
 - Supabase account (for authentication and database)
@@ -111,9 +112,9 @@ The cart system uses **Medusa.js v2 native cart APIs** for both guest and logged
 ```typescript
 // Create cart via Medusa API
 async function createMedusaCart(
-  storeType: 'electronics' | 'health',
+  storeType: "electronics" | "health",
   customerId?: string
-): Promise<string>
+): Promise<string>;
 
 // Add item to cart
 export async function addItemToCart(
@@ -121,7 +122,7 @@ export async function addItemToCart(
   quantity: number,
   isLoggedIn: boolean,
   customerId?: string
-): Promise<CartItem[]>
+): Promise<CartItem[]>;
 
 // Update quantity
 export async function updateItemQuantity(
@@ -129,24 +130,25 @@ export async function updateItemQuantity(
   quantity: number,
   isLoggedIn: boolean,
   customerId?: string
-): Promise<CartItem[]>
+): Promise<CartItem[]>;
 
 // Remove item
 export async function removeItemFromCart(
   productId: string,
   isLoggedIn: boolean,
   customerId?: string
-): Promise<CartItem[]>
+): Promise<CartItem[]>;
 
 // Sync cart on login
 export async function syncLocalCartToMedusa(
   customerId: string
-): Promise<CartItem[]>
+): Promise<CartItem[]>;
 ```
 
 #### Cart Flow
 
 **Guest User:**
+
 1. User adds item to cart
 2. Cart created via `POST /store/carts`
 3. Item added via `POST /store/carts/{id}/line-items`
@@ -154,12 +156,14 @@ export async function syncLocalCartToMedusa(
 5. Cart items cached locally
 
 **Logged-in User:**
+
 1. User adds item to cart
 2. Cart created with customer_id via `POST /store/carts`
 3. Item added via Medusa API
 4. Cart synced to backend automatically
 
 **Login Transition:**
+
 1. User has guest cart (3 items)
 2. User logs in
 3. `syncLocalCartToMedusa()` called
@@ -169,12 +173,12 @@ export async function syncLocalCartToMedusa(
 
 ### Performance
 
-| Operation | Guest | Logged-in | 
-|-----------|-------|-----------|
-| Add to cart | ~500ms | ~800ms |
-| Update quantity | ~400ms | ~700ms |
-| Remove item | ~400ms | ~700ms |
-| Page load | Instant | Instant |
+| Operation       | Guest   | Logged-in |
+| --------------- | ------- | --------- |
+| Add to cart     | ~500ms  | ~800ms    |
+| Update quantity | ~400ms  | ~700ms    |
+| Remove item     | ~400ms  | ~700ms    |
+| Page load       | Instant | Instant   |
 
 ---
 
@@ -183,6 +187,7 @@ export async function syncLocalCartToMedusa(
 ### Overview
 
 Orders are created using **Medusa v2's cart completion flow**, which handles:
+
 - Order creation
 - Email notifications
 - Inventory updates
@@ -203,12 +208,12 @@ export interface CreateOrderRequest {
     country_code: string;
     phone: string;
   };
-  paymentMethod: 'payfast' | 'ozow' | 'manual';
+  paymentMethod: "payfast" | "ozow" | "manual";
 }
 
 export async function completeCart(
   request: CreateOrderRequest
-): Promise<OrderResponse>
+): Promise<OrderResponse>;
 ```
 
 ### Order Creation Flow
@@ -236,19 +241,23 @@ Clear local cart
 ### Checkout Process
 
 **Step 1: Authentication**
+
 - Login or signup
 - Or continue as guest
 
 **Step 2: Shipping Information**
+
 - Delivery: Full address required
 - Pickup: Select store location
 
 **Step 3: Payment Method**
+
 - PayFast (online payment)
 - Ozow (instant EFT)
 - Pay at Store (pickup only)
 
 **Step 4: Review & Complete**
+
 - Review order details
 - Complete order
 - Redirect to payment (if online)
@@ -261,21 +270,24 @@ Clear local cart
 const createManualOrder = async () => {
   const orderRequest: CreateOrderRequest = {
     email: formData.email,
-    paymentMethod: 'manual',
-    shippingAddress: deliveryMethod === 'delivery' ? {
-      first_name: formData.firstName,
-      last_name: formData.lastName,
-      address_1: formData.address,
-      city: formData.city,
-      province: formData.province,
-      postal_code: formData.zipCode,
-      country_code: 'ZA',
-      phone: formData.phone
-    } : undefined
+    paymentMethod: "manual",
+    shippingAddress:
+      deliveryMethod === "delivery"
+        ? {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            address_1: formData.address,
+            city: formData.city,
+            province: formData.province,
+            postal_code: formData.zipCode,
+            country_code: "ZA",
+            phone: formData.phone,
+          }
+        : undefined,
   };
 
   const result = await completeCart(orderRequest);
-  
+
   if (result.success) {
     toast.success(`Order created! Order ID: ${result.orderId}`);
     onComplete();
@@ -307,6 +319,7 @@ export async function initializePayFast(
 ```
 
 **Features:**
+
 - Secure payment processing
 - All major SA banks supported
 - Credit/debit cards accepted
@@ -325,6 +338,7 @@ export async function initializeOzow(
 ```
 
 **Features:**
+
 - Instant bank transfer
 - No waiting period
 - Direct bank integration
@@ -344,6 +358,7 @@ export async function initializeOzow(
 
 **Provider:** Supabase Auth  
 **Features:**
+
 - Email/password authentication
 - Social logins (optional)
 - Secure session management
@@ -352,16 +367,19 @@ export async function initializeOzow(
 ### Profile Features
 
 1. **Personal Information**
+
    - Name, email, phone
    - Edit profile details
    - Profile picture
 
 2. **Order History**
+
    - View past orders
    - Order details
    - Tracking information
 
 3. **Wishlist**
+
    - Save favorite products
    - Quick add to cart
    - Share wishlist
@@ -377,12 +395,12 @@ export async function initializeOzow(
 // src/lib/auth-context.tsx
 export function useAuth() {
   return {
-    user,           // Supabase user
-    customer,       // Medusa customer
-    signUp,         // Register new user
-    signIn,         // Login
-    signOut,        // Logout
-    loading         // Auth state
+    user, // Supabase user
+    customer, // Medusa customer
+    signUp, // Register new user
+    signIn, // Login
+    signOut, // Logout
+    loading, // Auth state
   };
 }
 ```
@@ -394,12 +412,14 @@ export function useAuth() {
 ### Overview
 
 ZABS supports two sales channels:
+
 1. **Electronics Store**
 2. **Healthcare Store**
 
 ### Configuration
 
 Each sales channel has:
+
 - Unique publishable API key
 - Separate product catalog
 - Independent inventory
@@ -420,9 +440,7 @@ export const ELECTRONICS_STORE_KEY = "pk_electronics_...";
 export const HEALTH_STORE_KEY = "pk_health_...";
 
 export function getPublishableKey(store: StoreType): string {
-  return store === 'electronics' 
-    ? ELECTRONICS_STORE_KEY 
-    : HEALTH_STORE_KEY;
+  return store === "electronics" ? ELECTRONICS_STORE_KEY : HEALTH_STORE_KEY;
 }
 ```
 
@@ -434,9 +452,9 @@ export function getPublishableKey(store: StoreType): string {
 
 ```typescript
 // Heavy components loaded on demand
-const HealthCareStore = lazy(() => import('./components/HealthCareStore'));
-const ElectronicsStore = lazy(() => import('./components/ElectronicsStore'));
-const ProductDetails = lazy(() => import('./components/ProductDetails'));
+const HealthCareStore = lazy(() => import("./components/HealthCareStore"));
+const ElectronicsStore = lazy(() => import("./components/ElectronicsStore"));
+const ProductDetails = lazy(() => import("./components/ProductDetails"));
 ```
 
 **Result:** 50% faster initial page load
@@ -447,7 +465,7 @@ const ProductDetails = lazy(() => import('./components/ProductDetails'));
 // Cache products for 10 minutes
 preloadCache(
   CACHE_KEYS.HEALTH_PRODUCTS,
-  () => fetchProductsByStore('health'),
+  () => fetchProductsByStore("health"),
   10 * 60 * 1000
 );
 ```
@@ -468,13 +486,13 @@ preloadCache(
 
 ### Performance Metrics
 
-| Metric | Target | Actual |
-|--------|--------|--------|
-| First Contentful Paint | < 1.5s | ~1.2s |
-| Time to Interactive | < 3s | ~2.5s |
-| Largest Contentful Paint | < 2.5s | ~2s |
-| Cart Operation (Guest) | < 100ms | ~50ms |
-| Cart Operation (Logged-in) | < 1s | ~700ms |
+| Metric                     | Target  | Actual |
+| -------------------------- | ------- | ------ |
+| First Contentful Paint     | < 1.5s  | ~1.2s  |
+| Time to Interactive        | < 3s    | ~2.5s  |
+| Largest Contentful Paint   | < 2.5s  | ~2s    |
+| Cart Operation (Guest)     | < 100ms | ~50ms  |
+| Cart Operation (Logged-in) | < 1s    | ~700ms |
 
 ---
 
@@ -483,30 +501,38 @@ preloadCache(
 ### Common Issues
 
 #### Cart not persisting
+
 **Symptom:** Cart empties on refresh  
 **Solution:**
+
 1. Check if cart ID is in localStorage (`zabs_cart_id`)
 2. Verify Medusa backend is running
 3. Check browser console for errors
 
 #### Order creation fails
+
 **Symptom:** Error when completing order  
 **Solution:**
+
 1. Verify cart has items
 2. Check all required fields are filled
 3. Ensure customer email is valid
 4. Check Medusa backend logs
 
 #### Payment redirect fails
+
 **Symptom:** Payment gateway doesn't load  
 **Solution:**
+
 1. Verify payment gateway credentials in `.env`
 2. Check if sandbox mode is correctly configured
 3. Ensure return URLs are whitelisted
 
 #### Products not loading
+
 **Symptom:** Empty store pages  
 **Solution:**
+
 1. Check Medusa backend is running
 2. Verify publishable API keys are correct
 3. Check sales channel configuration
@@ -518,7 +544,7 @@ Enable detailed logging:
 
 ```typescript
 // In browser console
-localStorage.setItem('debug', 'zabs:*');
+localStorage.setItem("debug", "zabs:*");
 ```
 
 ### Support
@@ -541,6 +567,7 @@ localStorage.setItem('debug', 'zabs:*');
 ## ✅ Checklist for Deployment
 
 ### Frontend
+
 - [ ] Environment variables configured
 - [ ] Publishable keys updated
 - [ ] Payment gateway credentials set
@@ -549,6 +576,7 @@ localStorage.setItem('debug', 'zabs:*');
 - [ ] Preview build (`npm run preview`)
 
 ### Backend
+
 - [ ] Medusa backend deployed
 - [ ] Database migrated
 - [ ] Sales channels created
@@ -557,6 +585,7 @@ localStorage.setItem('debug', 'zabs:*');
 - [ ] Email notifications working
 
 ### Testing
+
 - [ ] Guest cart flow
 - [ ] Logged-in cart flow
 - [ ] Cart sync on login
@@ -577,10 +606,10 @@ ZABS E-Commerce Platform is now fully integrated with Medusa.js v2, providing:
 ✅ **Multiple payment options** - PayFast, Ozow, and pay at store  
 ✅ **User authentication** - Supabase-powered auth system  
 ✅ **Multi-store support** - Electronics and Healthcare channels  
-✅ **Performance optimized** - Fast, responsive, and scalable  
+✅ **Performance optimized** - Fast, responsive, and scalable
 
 **Ready for production! 🚀**
 
 ---
 
-*For detailed implementation of specific features, refer to the source code in `src/components/` and `src/lib/` directories.*
+_For detailed implementation of specific features, refer to the source code in `src/components/` and `src/lib/` directories._
