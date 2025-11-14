@@ -13,29 +13,21 @@ export async function fetchProductsByStore(store: StoreType): Promise<Product[]>
   
   // Try cache first
   const cached = productCache.get<Product[]>(cacheKey);
-  if (cached) {
-    console.log(`✅ Cache HIT: ${store} products`);
-    return cached;
-  }
+  if (cached) return cached;
 
   try {
-    console.log(`❌ Cache MISS: Fetching ${store} products...`);
-    
     // First, try to get available regions
     let regionId = DEFAULT_REGION;
     try {
       const regionsResponse = await fetchFromMedusa('/store/regions', {}, store);
       if (regionsResponse.regions && regionsResponse.regions.length > 0) {
-        // Use the first available region
         regionId = regionsResponse.regions[0].id;
-        console.log(`Using region: ${regionId}`);
       }
     } catch (regionError) {
-      console.warn('Could not fetch regions, using default');
+      // Use default region
     }
     
     // Fetch products from Medusa Store API
-    // The publishable key in fetchFromMedusa automatically filters by sales channel
     const response = await fetchFromMedusa(
       `/store/products?limit=100&region_id=${regionId}&fields=*variants,*variants.prices,*variants.calculated_price,*images,*categories`,
       {},
@@ -43,11 +35,8 @@ export async function fetchProductsByStore(store: StoreType): Promise<Product[]>
     );
 
     if (!response.products || response.products.length === 0) {
-      console.warn(`No products found for ${store} store`);
       return [];
     }
-
-    console.log(`Found ${response.products.length} products for ${store} store`);
 
     // Convert Medusa products to frontend format
     const products = response.products.map((medusaProduct: MedusaProduct) =>
@@ -56,7 +45,6 @@ export async function fetchProductsByStore(store: StoreType): Promise<Product[]>
 
     // Cache for 10 minutes
     productCache.set(cacheKey, products, 10 * 60 * 1000);
-    console.log(`💾 Cached ${store} products`);
 
     return products;
   } catch (error) {
@@ -235,21 +223,63 @@ export async function fetchRegions() {
 }
 
 /**
- * Create a cart for the specified region
+ * Create a cart for the specified region and sales channel
  * @param regionId - Region ID (e.g., 'za' for South Africa)
+ * @param customerId - Customer ID (for logged-in users - will be set after cart creation)
+ * @param salesChannelId - Sales channel ID (optional, auto-detected from store)
+ * @param store - Store type (electronics or health)
  * @returns Cart object
  */
-export async function createCart(regionId: string = DEFAULT_REGION) {
+export async function createCart(
+  regionId: string = DEFAULT_REGION,
+  customerId?: string,
+  salesChannelId?: string,
+  store: StoreType = 'electronics'
+) {
   try {
+    // ℹ️ Medusa v2: Create cart first, then update with customer info
+    const body: any = { region_id: regionId };
+    
+    // Include sales_channel_id if provided (required for multi-channel publishable keys)
+    if (salesChannelId) {
+      body.sales_channel_id = salesChannelId;
+    }
+    
+    console.log('� Creating cart...', customerId ? `for customer: ${customerId}` : '(guest)');
+    
     const response = await fetchFromMedusa(
       '/store/carts',
       {
         method: 'POST',
-        body: JSON.stringify({ region_id: regionId }),
+        body: JSON.stringify(body),
       },
-      'electronics'
+      store
     );
-    return response.cart;
+    
+    const cart = response.cart;
+    
+    // 🔐 If customer_id provided, update the cart to associate it with the customer
+    if (customerId && cart?.id) {
+      try {
+        console.log('🔐 Associating cart with customer:', customerId);
+        const updatedResponse = await fetchFromMedusa(
+          `/store/carts/${cart.id}`,
+          {
+            method: 'POST',
+            body: JSON.stringify({ customer_id: customerId }),
+          },
+          store
+        );
+        console.log('✅ Cart associated with customer:', customerId);
+        return updatedResponse.cart;
+      } catch (updateError) {
+        console.warn('⚠️ Failed to associate cart with customer, continuing with guest cart:', updateError);
+        // Return the cart anyway - it will work as guest cart
+        return cart;
+      }
+    }
+    
+    return cart;
   } catch (error) {
     console.error('Error creating cart:', error);
     throw error;

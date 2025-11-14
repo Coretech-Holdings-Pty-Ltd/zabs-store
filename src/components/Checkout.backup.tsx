@@ -9,16 +9,6 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Card } from './ui/card';
 import { motion } from 'motion/react';
 import { useAuth } from '../lib/auth-context';
-import { 
-  initializePayFast as initPayFastPayment, 
-  initializeOzow as initOzowPayment, 
-  createManualPaymentRecord,
-  PaymentRequest,
-  isPayFastConfigured,
-  isOzowConfigured
-} from '../lib/payment-service';
-import { completeCart, type CreateOrderRequest } from '../lib/order-service';
-import * as CartService from '../lib/cart-service';
 
 interface CheckoutProps {
   items: CartItem[];
@@ -227,39 +217,38 @@ export function Checkout({ items, total, onBack, onComplete }: CheckoutProps) {
   const initializePayFast = async () => {
     setIsProcessing(true);
     try {
-      const orderId = `ORD-${Date.now()}`;
-      const request: PaymentRequest = {
-        orderId,
-        amount: finalTotal,
-        customerEmail: formData.email,
-        customerName: `${formData.firstName} ${formData.lastName}`,
-        customerPhone: formData.phone,
-        items: items.map(item => ({
-          name: item.product.name,
-          quantity: item.quantity,
-          price: item.product.price
-        }))
-      };
+      const response = await fetch(`${import.meta.env.VITE_MEDUSA_BACKEND_URL}/store/payfast/init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Math.round(finalTotal * 100),
+          order_id: `ORDER-${Date.now()}`,
+          customer_name: `${formData.firstName} ${formData.lastName}`,
+          customer_email: formData.email,
+          customer_phone: formData.phone,
+        }),
+      });
 
-      const result = await initPayFastPayment(request);
+      const data = await response.json();
 
-      if (result.success && result.redirectUrl) {
-        // Store cart for post-payment restoration
-        localStorage.setItem('pre_payment_cart', JSON.stringify(items));
-        localStorage.setItem('pre_payment_customer', JSON.stringify({
-          formData,
-          deliveryMethod,
-          paymentMethod
-        }));
+      if (data.payment_url && data.payment_data) {
+        // Create a form and submit to PayFast
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = data.payment_url;
 
-        // Redirect to PayFast
-        window.location.href = result.redirectUrl;
-      } else {
-        toast.error(result.error || 'Failed to initialize PayFast payment');
-        setIsProcessing(false);
+        Object.entries(data.payment_data).forEach(([key, value]) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = String(value);
+          form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+        form.submit();
       }
     } catch (error) {
-      console.error('PayFast initialization error:', error);
       toast.error('Failed to initialize PayFast payment');
       setIsProcessing(false);
     }
@@ -268,39 +257,24 @@ export function Checkout({ items, total, onBack, onComplete }: CheckoutProps) {
   const initializeOzow = async () => {
     setIsProcessing(true);
     try {
-      const orderId = `ORD-${Date.now()}`;
-      const request: PaymentRequest = {
-        orderId,
-        amount: finalTotal,
-        customerEmail: formData.email,
-        customerName: `${formData.firstName} ${formData.lastName}`,
-        customerPhone: formData.phone,
-        items: items.map(item => ({
-          name: item.product.name,
-          quantity: item.quantity,
-          price: item.product.price
-        }))
-      };
+      const response = await fetch(`${import.meta.env.VITE_MEDUSA_BACKEND_URL}/store/ozow/init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Math.round(finalTotal * 100),
+          order_id: `ORDER-${Date.now()}`,
+          customer_name: `${formData.firstName} ${formData.lastName}`,
+          customer_email: formData.email,
+          customer_phone: formData.phone,
+        }),
+      });
 
-      const result = await initOzowPayment(request);
+      const data = await response.json();
 
-      if (result.success && result.redirectUrl) {
-        // Store cart for post-payment restoration
-        localStorage.setItem('pre_payment_cart', JSON.stringify(items));
-        localStorage.setItem('pre_payment_customer', JSON.stringify({
-          formData,
-          deliveryMethod,
-          paymentMethod
-        }));
-
-        // Redirect to Ozow
-        window.location.href = result.redirectUrl;
-      } else {
-        toast.error(result.error || 'Failed to initialize Ozow payment');
-        setIsProcessing(false);
+      if (data.payment_url) {
+        window.location.href = data.payment_url;
       }
     } catch (error) {
-      console.error('Ozow initialization error:', error);
       toast.error('Failed to initialize Ozow payment');
       setIsProcessing(false);
     }
@@ -308,51 +282,11 @@ export function Checkout({ items, total, onBack, onComplete }: CheckoutProps) {
 
   const createManualOrder = async () => {
     setIsProcessing(true);
-    try {
-      // Prepare order request
-      const orderRequest: CreateOrderRequest = {
-        email: formData.email || user?.email || '',
-        paymentMethod: 'manual', // Pay at store
-        shippingAddress: deliveryMethod === 'delivery' ? {
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          address_1: formData.address,
-          city: formData.city,
-          province: formData.province,
-          postal_code: formData.zipCode,
-          country_code: 'ZA',
-          phone: formData.phone
-        } : undefined
-      };
-
-      // Complete cart and create order via Medusa
-      const result = await completeCart(orderRequest);
-
-      if (!result.success) {
-        toast.error(result.error || 'Failed to create order');
-        setIsProcessing(false);
-        return;
-      }
-
-      // Cart is now marked as completed - Medusa handles everything
-      // Show success
-      toast.success(`Order created! Order ID: ${result.orderId}`, {
-        description: deliveryMethod === 'pickup' 
-          ? 'Please pay at the store when collecting your items.'
-          : 'A confirmation email has been sent. Please pay when your order arrives.',
-        duration: 5000
-      });
-
-      // Complete checkout
-      setTimeout(() => {
-        onComplete();
-        setIsProcessing(false);
-      }, 1500);
-    } catch (error) {
-      console.error('Order creation error:', error);
-      toast.error('Failed to create order');
-      setIsProcessing(false);
-    }
+    // Simulate order creation
+    setTimeout(() => {
+      toast.success('Order created! Please pay at the store when collecting.');
+      onComplete();
+    }, 1000);
   };
 
   const handleSubmit = () => {
@@ -853,38 +787,36 @@ export function Checkout({ items, total, onBack, onComplete }: CheckoutProps) {
                         </Card>
                       </motion.div>
 
-                      {/* Ozow - Only show if configured */}
-                      {isOzowConfigured() && (
-                        <motion.div
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => setPaymentMethod('ozow')}
-                          className="relative cursor-pointer"
-                        >
-                          <Card className={`relative overflow-hidden transition-all duration-300 border-2 ${
-                            paymentMethod === 'ozow' 
-                              ? 'border-indigo-500 shadow-lg shadow-indigo-500/20 bg-gradient-to-br from-indigo-50 to-blue-50' 
-                              : 'border-gray-200 hover:border-indigo-300 hover:shadow-md'
-                          }`}>
-                            <div className="flex items-center gap-4 p-5">
-                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transition-all ${
-                                paymentMethod === 'ozow' 
-                                  ? 'bg-gradient-to-br from-indigo-500 to-blue-600' 
-                                  : 'bg-gray-100'
-                              }`}>
-                                <Building2 className={`w-6 h-6 ${paymentMethod === 'ozow' ? 'text-white' : 'text-gray-600'}`} />
-                              </div>
-                              <div className="flex-1">
-                                <div className="font-semibold text-gray-900">Ozow</div>
-                                <div className="text-sm text-gray-600">Instant EFT • Fast & secure</div>
-                              </div>
+                      {/* Ozow */}
+                      <motion.div
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setPaymentMethod('ozow')}
+                        className="relative cursor-pointer"
+                      >
+                        <Card className={`relative overflow-hidden transition-all duration-300 border-2 ${
+                          paymentMethod === 'ozow' 
+                            ? 'border-indigo-500 shadow-lg shadow-indigo-500/20 bg-gradient-to-br from-indigo-50 to-blue-50' 
+                            : 'border-gray-200 hover:border-indigo-300 hover:shadow-md'
+                        }`}>
+                          <div className="flex items-center gap-4 p-5">
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transition-all ${
+                              paymentMethod === 'ozow' 
+                                ? 'bg-gradient-to-br from-indigo-500 to-blue-600' 
+                                : 'bg-gray-100'
+                            }`}>
+                              <Building2 className={`w-6 h-6 ${paymentMethod === 'ozow' ? 'text-white' : 'text-gray-600'}`} />
                             </div>
-                            {paymentMethod === 'ozow' && (
-                              <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-500 to-blue-600 -mr-8 -mt-8 rotate-45" />
-                            )}
-                          </Card>
-                        </motion.div>
-                      )}
+                            <div className="flex-1">
+                              <div className="font-semibold text-gray-900">Ozow</div>
+                              <div className="text-sm text-gray-600">Instant EFT • Fast & secure</div>
+                            </div>
+                          </div>
+                          {paymentMethod === 'ozow' && (
+                            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-500 to-blue-600 -mr-8 -mt-8 rotate-45" />
+                          )}
+                        </Card>
+                      </motion.div>
 
                       {/* Pay at Store - ONLY for PICKUP */}
                       {deliveryMethod === 'pickup' && (
@@ -1001,34 +933,6 @@ export function Checkout({ items, total, onBack, onComplete }: CheckoutProps) {
 
                   <div className="bg-gray-50 rounded-xl p-6">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold">Delivery Method</h3>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditStep(1)}
-                        className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-                      >
-                        <Edit2 className="w-4 h-4 mr-1" />
-                        Edit
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      {deliveryMethod === 'delivery' ? (
-                        <>
-                          <Truck className="w-4 h-4 text-purple-600" />
-                          <span>Home Delivery</span>
-                        </>
-                      ) : (
-                        <>
-                          <Store className="w-4 h-4 text-purple-600" />
-                          <span>Store Pickup - {storeLocations.find(loc => loc.value === formData.storeLocation)?.label}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 rounded-xl p-6">
-                    <div className="flex items-center justify-between mb-4">
                       <h3 className="font-semibold">Shipping Information</h3>
                       <Button
                         variant="ghost"
@@ -1044,12 +948,8 @@ export function Checkout({ items, total, onBack, onComplete }: CheckoutProps) {
                       <p>{formData.firstName} {formData.lastName}</p>
                       <p>{formData.email}</p>
                       <p>{formData.phone}</p>
-                      {deliveryMethod === 'delivery' && (
-                        <>
-                          <p>{formData.address}</p>
-                          <p>{formData.city}, {formData.province} {formData.zipCode}</p>
-                        </>
-                      )}
+                      <p>{formData.address}</p>
+                      <p>{formData.city}, {formData.province} {formData.zipCode}</p>
                     </div>
                   </div>
 
@@ -1066,26 +966,9 @@ export function Checkout({ items, total, onBack, onComplete }: CheckoutProps) {
                         Edit
                       </Button>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      {paymentMethod === 'payfast' && (
-                        <>
-                          <CreditCard className="w-4 h-4 text-purple-600" />
-                          <span>PayFast - Card/EFT Payment</span>
-                        </>
-                      )}
-                      {paymentMethod === 'ozow' && (
-                        <>
-                          <Building2 className="w-4 h-4 text-indigo-600" />
-                          <span>Ozow - Instant EFT</span>
-                        </>
-                      )}
-                      {paymentMethod === 'store' && (
-                        <>
-                          <Banknote className="w-4 h-4 text-teal-600" />
-                          <span>Pay at Store - Cash/Card on Collection</span>
-                        </>
-                      )}
-                    </div>
+                    <p className="text-sm text-gray-600">
+                      Card ending in {formData.cardNumber.slice(-4)}
+                    </p>
                   </div>
 
                   <div className="bg-gray-50 rounded-xl p-6">
@@ -1123,18 +1006,9 @@ export function Checkout({ items, total, onBack, onComplete }: CheckoutProps) {
                 ) : (
                   <Button 
                     onClick={handleSubmit}
-                    disabled={isProcessing}
-                    className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-2xl h-12 shadow-lg shadow-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-2xl h-12 shadow-lg shadow-purple-500/30"
                   >
-                    {isProcessing ? (
-                      <span className="flex items-center gap-2">
-                        <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Processing...
-                      </span>
-                    ) : 'Place Order'}
+                    Place Order
                   </Button>
                 )}
               </div>

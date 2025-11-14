@@ -81,6 +81,11 @@ export function ProductDetails({ product, onAddToCart, onBack }: ProductDetailsP
   const checkCanReview = async () => {
     if (!customer) return;
     
+    // TODO: Fix customer_ordered_product SQL function - currently broken
+    // For now, allow all logged-in customers to review
+    setCanReview(true);
+    
+    /* DISABLED - SQL function has bug with o.items column
     try {
       const { data, error } = await supabase
         .rpc('customer_ordered_product', {
@@ -93,6 +98,7 @@ export function ProductDetails({ product, onAddToCart, onBack }: ProductDetailsP
     } catch (error) {
       console.error('Error checking review eligibility:', error);
     }
+    */
   };
 
   const handleSubmitReview = async () => {

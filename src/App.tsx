@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { LandingPage } from './components/LandingPage';
@@ -26,6 +26,12 @@ import { fetchProductsByStore } from './lib/api';
 import { StoreType } from './lib/config';
 import { preloadCache, CACHE_KEYS } from './lib/cache';
 
+// Import auth context
+import { useAuth } from './lib/auth-context';
+
+// Import cart service
+import * as CartService from './lib/cart-service';
+
 type Page = 'landing' | 'healthcare' | 'electronics' | 'product' | 'cart' | 'checkout' | 'success' | 'about' | 'help' | 'search' | 'profile';
 
 // Loading component for suspense fallback
@@ -41,9 +47,13 @@ function PageLoader() {
 }
 
 export default function App() {
+  const { user } = useAuth(); // Get authentication state
   const [currentPage, setCurrentPage] = useState<Page>('landing');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
+    // Load cart from localStorage on initial render
+    return CartService.getLocalCart();
+  });
   const [searchQuery, setSearchQuery] = useState('');
   
   // Medusa products state - NOW LOADED LAZILY
@@ -51,6 +61,48 @@ export default function App() {
   const [electronicsProducts, setElectronicsProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(false); // Changed to false initially
   const [productsError, setProductsError] = useState<string | null>(null);
+
+  // Track if cart has been synced to prevent duplicate syncs
+  const cartSyncedRef = useRef(false);
+  const hasLoadedCartRef = useRef(false);
+
+  // 🔄 Load cart when user is already logged in (page reload) or sync when they just logged in
+  useEffect(() => {
+    if (user?.id && !hasLoadedCartRef.current) {
+      const loadCart = async () => {
+        const localCart = CartService.getLocalCart();
+        
+        // If there's a local cart, sync it (user just logged in)
+        if (localCart.length > 0 && !cartSyncedRef.current) {
+          console.log('🔄 User logged in, syncing cart to Medusa with customer ID:', user.id);
+          const syncedCart = await CartService.syncLocalCartToMedusa(user.id);
+          setCartItems(syncedCart);
+          cartSyncedRef.current = true;
+          
+          // Clear localStorage after successful sync
+          CartService.clearCart();
+          
+          if (syncedCart.length > 0) {
+            toast.success('Cart synced!');
+          }
+        } else {
+          // No local cart - just load from database (page reload scenario)
+          const dbCart = await CartService.loadCartFromDatabase(user.id);
+          setCartItems(dbCart);
+        }
+        
+        hasLoadedCartRef.current = true;
+      };
+      loadCart();
+    } else if (!user?.id) {
+      // User logged out - reset refs
+      hasLoadedCartRef.current = false;
+      cartSyncedRef.current = false;
+    }
+  }, [user]);
+
+  // 💾 Cart changes are handled by cart-service (Medusa for logged-in, localStorage for guests)
+  // No need for separate useEffect to save to localStorage - cart-service handles it
 
   // 🚀 PERFORMANCE BOOST: Preload products in background AFTER landing page loads
   useEffect(() => {
@@ -162,50 +214,45 @@ export default function App() {
     }
   };
 
-  const handleAddToCart = (product: Product, quantity: number = 1) => {
+  const handleAddToCart = async (product: Product, quantity: number = 1) => {
     try {
-      setCartItems(prev => {
-        const existingItem = prev.find(item => item.product.id === product.id);
-        
-        if (existingItem) {
-          toast.success(`Updated ${product.name} quantity in cart`);
-          return prev.map(item =>
-            item.product.id === product.id
-              ? { ...item, quantity: item.quantity + quantity }
-              : item
-          );
-        } else {
-          toast.success(`Added ${product.name} to cart`);
-          return [...prev, { product, quantity }];
-        }
-      });
+      const isLoggedIn = !!user;
+      const updatedCart = await CartService.addItemToCart(product, quantity, isLoggedIn, user?.id);
+      setCartItems(updatedCart);
+      
+      const existingItem = cartItems.find(item => item.product.id === product.id);
+      if (existingItem) {
+        toast.success(`Updated ${product.name} quantity in cart`);
+      } else {
+        toast.success(`Added ${product.name} to cart`);
+      }
     } catch (error) {
       console.error('Add to cart error:', error);
       toast.error('Unable to add item to cart. Please try again.');
     }
   };
 
-  const handleUpdateQuantity = (productId: string, newQuantity: number) => {
+  const handleUpdateQuantity = async (productId: string, newQuantity: number) => {
     try {
       if (newQuantity <= 0) {
-        handleRemoveItem(productId);
+        await handleRemoveItem(productId);
         return;
       }
       
-      setCartItems(prev =>
-        prev.map(item =>
-          item.product.id === productId ? { ...item, quantity: newQuantity } : item
-        )
-      );
+      const isLoggedIn = !!user;
+      const updatedCart = await CartService.updateItemQuantity(productId, newQuantity, isLoggedIn, user?.id);
+      setCartItems(updatedCart);
     } catch (error) {
       console.error('Update quantity error:', error);
       toast.error('Unable to update quantity.');
     }
   };
 
-  const handleRemoveItem = (productId: string) => {
+  const handleRemoveItem = async (productId: string) => {
     try {
-      setCartItems(prev => prev.filter(item => item.product.id !== productId));
+      const isLoggedIn = !!user;
+      const updatedCart = await CartService.removeItemFromCart(productId, isLoggedIn, user?.id);
+      setCartItems(updatedCart);
       toast.info('Item removed from cart');
     } catch (error) {
       console.error('Remove item error:', error);
@@ -241,11 +288,16 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleOrderComplete = () => {
+  const handleOrderComplete = async () => {
     try {
-      setCurrentPage('success');
+      await CartService.clearCart();
       setCartItems([]);
+      setCurrentPage('success');
+      // Also clear any payment-related data
+      localStorage.removeItem('pre_payment_cart');
+      localStorage.removeItem('pre_payment_customer');
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      toast.success('Order completed successfully!');
     } catch (error) {
       console.error('Order completion error:', error);
       toast.error('There was an issue completing your order.');
